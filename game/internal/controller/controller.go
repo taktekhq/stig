@@ -36,6 +36,7 @@ func (c *Client) Apply(action game.Action) error {
 	); err != nil {
 		return err
 	}
+	c.action.Throttle = action.Throttle
 
 	if err := c.applyKey(
 		mapInputKey(game.SteeringStateMap, c.action.Steering),
@@ -43,8 +44,14 @@ func (c *Client) Apply(action game.Action) error {
 	); err != nil {
 		return err
 	}
+	c.action.Steering = action.Steering
 
 	return nil
+}
+
+// Reset releases any currently held keys.
+func (c *Client) Reset() error {
+	return c.Apply(game.Action{})
 }
 
 // ApplyKey applies a key action to the game.

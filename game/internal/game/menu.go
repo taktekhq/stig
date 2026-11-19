@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
@@ -16,6 +17,11 @@ func (c *Client) StartGame(ctx context.Context) error {
 		return fmt.Errorf("failed to find start button: %w", err)
 	}
 
+	// Ensure the button is interactable before clicking.
+	if _, err := startButton.Context(ctx).WaitInteractable(); err != nil {
+		return fmt.Errorf("failed to wait for start button to be interactable: %w", err)
+	}
+
 	// Click the "Start" button.
 	if err := startButton.Context(ctx).Click(proto.InputMouseButtonLeft, 1); err != nil {
 		return fmt.Errorf("failed to click on start button: %w", err)
@@ -24,12 +30,21 @@ func (c *Client) StartGame(ctx context.Context) error {
 	return nil
 }
 
-// ResetGame resets the game before the current one ends.
+// ResetGame returns to the main menu if needed and starts a fresh lap.
 func (c *Client) ResetGame(ctx context.Context) error {
-	// Press "Escape" to go back to the main menu.
-	pressEscape := c.Page.Context(ctx).KeyActions().Type(input.Escape)
-	if err := pressEscape.Do(); err != nil {
-		return fmt.Errorf("failed to press escape: %w", err)
+	startButton, err := c.Page.Context(ctx).ElementX(`//span[text()="Start"]`)
+	if err != nil {
+		return fmt.Errorf("failed to find start button: %w", err)
+	}
+
+	// Only press Escape if we are not already on the splash screen
+	// (pressing Escape on the splash screen starts the game itself and races with StartGame).
+	if _, interactErr := startButton.Context(ctx).Interactable(); interactErr != nil {
+		pressEscape := c.Page.Context(ctx).KeyActions().Type(input.Escape)
+		if err := pressEscape.Do(); err != nil {
+			return fmt.Errorf("failed to press escape: %w", err)
+		}
+		time.Sleep(250 * time.Millisecond)
 	}
 
 	// Start the game.

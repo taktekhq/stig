@@ -92,24 +92,50 @@ func playLap(
 	screenClient *screen.Client,
 	timeout time.Duration,
 ) error {
-	// Lap context.
-	ctx, cancel := context.WithTimeout(parentCtx, timeout)
-	defer cancel()
-
-	// Reset the game.
-	if err := gameClient.ResetGame(ctx); err != nil {
+	// Reset the game using a dedicated reset timeout so the full lap timeout is available for driving.
+	resetCtx, resetCancel := context.WithTimeout(parentCtx, 15*time.Second)
+	defer resetCancel()
+	if err := gameClient.ResetGame(resetCtx); err != nil {
 		return fmt.Errorf("failed to reset game: %w", err)
 	}
 
 	// Wait for the countdown to finish.
-	time.Sleep(3 * time.Second)
+	select {
+	case <-parentCtx.Done():
+		return parentCtx.Err()
+	case <-time.After(3 * time.Second):
+	}
 
-	go gameClient.RunInGameLoop(ctx,
-		startGameplay(agentClient, controllerClient, screenClient))
+	// Lap context.
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
+	defer cancel()
+
+	loopCtx, loopCancel := context.WithCancel(ctx)
+	loopDone := make(chan struct{})
+	go func() {
+		defer close(loopDone)
+		_ = gameClient.RunInGameLoop(loopCtx,
+			startGameplay(agentClient, controllerClient, screenClient))
+	}()
 
 	// Wait for the game to finish.
-	if err := gameClient.WaitForFinish(ctx); err != nil {
-		return fmt.Errorf("failed to wait for game to finish: %w", err)
+	waitErr := gameClient.WaitForFinish(ctx)
+
+	loopCancel()
+	<-loopDone
+	_ = controllerClient.Reset()
+
+	if waitErr != nil {
+		return fmt.Errorf("failed to wait for game to finish: %w", waitErr)
+	}
+
+	// Read and report the replay time (also ensures the results time element has populated).
+	timeCtx, timeCancel := context.WithTimeout(parentCtx, 5*time.Second)
+	defer timeCancel()
+	if replayTime, err := gameClient.GetReplayTime(timeCtx); err != nil {
+		log.Printf("lap finished (failed to read replay time: %v)", err)
+	} else {
+		log.Printf("lap finished: %s", replayTime)
 	}
 
 	return nil

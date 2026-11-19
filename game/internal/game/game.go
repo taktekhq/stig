@@ -74,7 +74,10 @@ func NewClient(
 
 // Close closes the game client.
 func (c *Client) Close() {
-	if err := c.Page.Close(); err != nil {
+	closeCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := c.Page.Context(closeCtx).Close(); err != nil {
 		log.Println(fmt.Sprintf("failed to close page: %v", err))
 	}
 

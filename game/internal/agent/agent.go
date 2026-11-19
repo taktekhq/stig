@@ -24,17 +24,19 @@ type ClientConfiguration struct {
 
 // Client is the agent that plays the game.
 type Client struct {
-	apiURL  string
-	debug   bool
-	timeout time.Duration
+	apiURL     string
+	debug      bool
+	httpClient *http.Client
 }
 
 // NewClient creates a new client.
 func NewClient(cfg ClientConfiguration) *Client {
 	return &Client{
-		apiURL:  cfg.APIURL,
-		debug:   cfg.Debug,
-		timeout: cfg.Timeout,
+		apiURL: cfg.APIURL,
+		debug:  cfg.Debug,
+		httpClient: &http.Client{
+			Timeout: cfg.Timeout,
+		},
 	}
 }
 
@@ -43,11 +45,14 @@ func (c *Client) Act(frame []byte) (game.Action, error) {
 	url := fmt.Sprintf("%s/act", c.apiURL)
 
 	// Prepare the request.
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(frame))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(frame))
+	if err != nil {
+		return game.Action{}, fmt.Errorf("failed to create request: %w", err)
+	}
 	req.Header.Set("Content-Type", "image/jpeg")
 
 	// Send the request.
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if c.debug {
 			log.Println(fmt.Sprintf("agent failed to send request: %v", err))
@@ -55,6 +60,7 @@ func (c *Client) Act(frame []byte) (game.Action, error) {
 
 		return game.Action{}, fmt.Errorf("failed to send request: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		if c.debug {
