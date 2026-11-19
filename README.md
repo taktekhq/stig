@@ -27,11 +27,13 @@ make assets
 
 ### 2. Download Pre-trained Model
 
-Download the pre-trained novice model:
+Download the pre-trained racer model:
 
 ```bash
-make stig-novice
+make stig-racer
 ```
+
+It finishes laps on its own in about 1:55. The older `novice` model (`make stig-novice`, then `MODEL_NAME=novice` in `stig/env/.env`) is kept for reference and does not finish a lap.
 
 ### 3. Start Chrome with Remote Debugging
 
@@ -46,6 +48,8 @@ Open a new terminal and start Chrome with remote debugging enabled:
 ```bash
 google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/stig-profile
 ```
+
+The game client needs about 10 screenshots a second, so Chrome must render WebGL on a GPU. On a machine without a screen, add `--headless=new --enable-gpu --use-angle=gl-egl --mute-audio`. With software WebGL (SwiftShader) a screenshot takes seconds and the car cannot steer.
 
 ### 4. Configure WebSocket URL
 
@@ -80,7 +84,10 @@ make game-play
 
 ### Additional Commands
 
-- **Record gameplay:** `make game-record`
-- **Train a new model:** `make stig-train`
+- **Record human gameplay:** `make game-record`
+- **Collect automated oracle / DAgger training laps:** `python -m stig.cmd.collect.main --cdp-url http://127.0.0.1:9222 --recordings-dir assets/recordings --modes clean,perturbed,dagger,dagger` (requires Playwright)
+- **Train a new model:** `make stig-train` (trains `MODEL_NAME` from `RECORDINGS_DIR` into `assets/models/<MODEL_NAME>.pt`; default `MODEL_NAME=racer`, `EPOCHS=25`, `BATCH_SIZE=64`)
+
+> Note: `stig/cmd/autopilot` automatically detects whether a loaded `.pt` model expects 1-channel grayscale (`novice.pt`) or 3-channel RGB (`racer.pt`).
 
 [shopify-drive]: https://www.shopify.com/ca/editions/summer2025/drive
