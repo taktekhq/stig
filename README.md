@@ -4,7 +4,7 @@
 
 A mono-repo for the AI that plays the [Shopify Horizon Drive game][shopify-drive].
 
-https://github.com/user-attachments/assets/5d547526-0231-4aaf-8c16-8ac5838ad81a
+https://github.com/user-attachments/assets/584655f4-d168-49b9-a395-c6b7d8b57d83
 
 One full lap driven by the `racer` model, 1:52.517. The keys in the bottom left are what the model is holding.
 
